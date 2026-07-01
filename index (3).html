@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>ROBLOX 2026 - 홈 & 3D 메타버스 엔진</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; padding: 0; font-family: 'Arial', sans-serif; background: #191B1D; color: #FFFFFF; user-select: none; overflow-x: hidden; }
+        
+        /* 헤더 바 */
+        header { background: #222529; height: 55px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.3); position: relative; z-index: 20; }
+        .logo { font-size: 22px; font-weight: 900; color: #FFF; letter-spacing: -1px; }
+        .user-tag { background: #393E46; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: bold; color: #00f2ff; }
+
+        /* 인증 및 홈 화면 레이어 */
+        .overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(15,15,15,0.95); display: flex; align-items: center; justify-content: center; z-index: 100; }
+        .auth-box { background: #222529; padding: 40px; border-radius: 12px; width: 340px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .auth-box h2 { margin-top: 0; font-size: 26px; color: #FFF; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #393E46; border-radius: 6px; box-sizing: border-box; background: #191B1D; color: #FFF; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 5px 0; font-size: 14px; transition: 0.2s; }
+        .btn-blue { background: #0074E4; color: white; }
+        .btn-green { background: #00B060; color: white; }
+
+        /* 메인 홈페이지 콘텐츠 레이아웃 */
+        #web-home { max-width: 1200px; margin: 0 auto; padding: 25px 20px; display: grid; grid-template-columns: 1fr 320px; gap: 25px; }
+        .section-title { font-size: 22px; font-weight: bold; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+
+        /* 우측 친구 관리 패널 */
+        .friends-panel { background: #222529; border-radius: 10px; padding: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); height: calc(100vh - 150px); overflow-y: auto; }
+        .friend-search-box { display: flex; gap: 8px; margin-bottom: 15px; }
+        .friend-search-box input { margin: 0; padding: 10px; }
+        .friend-search-box button { width: 70px; margin: 0; padding: 0; background: #0074E4; color: white; }
+        .friend-list { list-style: none; padding: 0; margin: 0; }
+        .friend-item { display: flex; align-items: center; justify-content: space-between; background: #191B1D; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #393E46; }
+        .friend-item.online { border-left-color: #00B060; }
+        .friend-name { font-size: 14px; font-weight: bold; }
+        .friend-status { font-size: 11px; color: #aaa; }
+        .req-buttons { display: flex; gap: 4px; }
+        .btn-sm-accept { background: #00B060; color: white; width: 45px; padding: 6px 0; font-size: 11px; }
+        .btn-sm-decline { background: #E63946; color: white; width: 45px; padding: 6px 0; font-size: 11px; }
+
+        /* 추천 게임 그리드 */
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 16px; margin-bottom: 30px; }
+        .game-card { background: #222529; border-radius: 8px; overflow: hidden; cursor: pointer; transition: 0.2s; border: 1px solid transparent; box-shadow: 0 4px 10px rgba(0,0,0,0.15); }
+        .game-card:hover { transform: translateY(-5px); border-color: #00f2ff; }
+        .game-thumb { height: 110px; background: #393E46; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+        .game-info { padding: 12px; }
+        .game-name { font-size: 14px; font-weight: bold; margin: 0 0 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .game-stats { font-size: 11px; color: #aaa; }
+
+        /* 3D 인게임 전용 화면 및 UI 설정 */
+        #game-container { width: 100vw; height: 100vh; display: none; position: absolute; top: 0; left: 0; z-index: 1; }
+        #chat-ui { position: fixed; bottom: 20px; left: 20px; width: 360px; z-index: 30; display: none; pointer-events: auto; }
+        #chat-messages { height: 160px; background: rgba(0,0,0,0.6); color: white; overflow-y: auto; padding: 10px; border-radius: 6px; list-style: none; margin: 0; font-size: 14px; border: 1px solid rgba(255,255,255,0.1); }
+        #chat-input-box { display: flex; margin-top: 6px; }
+        #chat-input { flex: 1; padding: 10px; border: none; border-radius: 6px 0 0 6px; margin: 0; background: #fff; color: #000; }
+        #chat-send { width: 70px; border-radius: 0 6px 6px 0; background: #0074E4; color: white; margin: 0; padding: 0; }
+        #back-to-home { position: fixed; top: 70px; left: 20px; z-index: 30; width: 120px; background: #E63946; color: white; display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">ROBLOX 2026</div>
+    <div id="user-display" class="user-tag">접속 대기 중...</div>
+</header>
+
+<div id="auth-screen" class="overlay">
+    <div class="auth-box">
+        <h2>ROBLOX HOME</h2>
+        <input type="email" id="email" placeholder="이메일 주소 (@ 포함)">
+        <input type="password" id="password" placeholder="비밀번호">
+        <button class="btn-blue" onclick="handleAuth('login')">로그인</button>
+        <button class="btn-green" onclick="handleAuth('signup')">회원가입</button>
+    </div>
+</div>
+
+<div id="web-home">
+    <main>
+        <div class="section-title">계속하기 (Continue)</div>
+        <div class="game-grid">
+            <div class="game-card" onclick="startGame('rainbow')">
+                <div class="game-thumb" style="background: linear-gradient(45deg, #ff0055, #ff5500);">🌈</div>
+                <div class="game-info">
+                    <div class="game-name">무지개 점프맵</div>
+                    <div class="game-stats">👍 94% · 👤 12.5K</div>
+                </div>
+            </div>
+            <div class="game-card" onclick="startGame('disaster')">
+                <div class="game-thumb" style="background: linear-gradient(45deg, #444, #111);">🌪️</div>
+                <div class="game-info">
+                    <div class="game-name">자연재해 서바이벌</div>
+                    <div class="game-stats">👍 87% · 👤 45.2K</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section-title">추천 게임 (Recommended For You)</div>
+        <div class="game-grid">
+            <div class="game-card" onclick="alert('준비 중인 맵입니다! 무지개맵이나 자연재해맵을 이용해 주세요.')">
+                <div class="game-thumb" style="background: #2c3e50;">🏡</div>
+                <div class="game-info"><div class="game-name">브룩헤이번 RP</div><div class="game-stats">👍 89% · 👤 110K</div></div>
+            </div>
+            <div class="game-card" onclick="alert('준비 중인 맵입니다!')">
+                <div class="game-thumb" style="background: #1b263b;">🚪</div>
+                <div class="game-info"><div class="game-name">DOORS (도어즈)</div><div class="game-stats">👍 95% · 👤 21.8K</div></div>
+            </div>
+        </div>
+    </main>
+
+    <aside class="friends-panel">
+        <div style="font-size: 16px; font-weight: bold; margin-bottom: 12px;">친구 찾기 & 요청</div>
+        <div class="friend-search-box">
+            <input type="text" id="target-user-input" placeholder="상대방 이메일 ID 입력">
+            <button onclick="sendFriendRequest()">요청</button>
+        </div>
+        <div style="font-size: 14px; font-weight: bold; margin: 20px 0 10px 0; color: #ffb703;">🔔 받은 요청 목록</div>
+        <ul id="request-list" class="friend-list"></ul>
+        <div style="font-size: 14px; font-weight: bold; margin: 20px 0 10px 0; color: #00B060;">👥 내 친구 목록</div>
+        <ul id="my-friend-list" class="friend-list"></ul>
+    </aside>
+</div>
+
+<div id="game-container"></div>
+<button id="back-to-home" onclick="exitGame()">🏠 홈으로 나가기</button>
+
+<div id="chat-ui">
+    <ul id="chat-messages"></ul>
+    <div id="chat-input-box">
+        <input type="text" id="chat-input" placeholder="메시지 입력 후 엔터...">
+        <button id="chat-send" onclick="sendChat()">전송</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+    import { getDatabase, ref, set, update, onValue, remove, push, onChildAdded } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDmVSOU_1iEfYdH01axEDXhhCiCnoxIJEc",
+        authDomain: "roblox-fe012.firebaseapp.com",
+        databaseURL: "https://roblox-fe012-default-rtdb.firebaseio.com",
+        projectId: "roblox-fe012",
+        storageBucket: "roblox-fe012.firebasestorage.app",
+        messagingSenderId: "139193121150",
+        appId: "1:139193121150:web:e61ca8ac6a5d0b80b35b2f",
+        measurementId: "G-X8JYFB29D8"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getDatabase(app);
+
+    let myUid = "";
+    let myName = "";
+
+    // --- 회원 가입 / 로그인 기능 ---
+    window.handleAuth = async (type) => {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value.trim();
+        if(!email || !password) { alert("계정 정보를 입력하세요."); return; }
+        
+        try {
+            if (type === 'login') {
+                await signInWithEmailAndPassword(auth, email, password);
+            } else {
+                const credential = await createUserWithEmailAndPassword(auth, email, password);
+                const pureName = email.split('@')[0];
+                await set(ref(db, `users/${credential.user.uid}`), { email: email, name: pureName, status: "online" });
+            }
+        } catch (e) { alert("인증 실패: " + e.message); }
+    };
+
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            myUid = user.uid;
+            myName = user.email.split('@')[0];
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('user-display').innerText = `👤 ${myName}`;
+            
+            update(ref(db, `users/${myUid}`), { status: "online", name: myName, email: user.email });
+            listenToFriendRequests();
+            listenToFriendList();
+        }
+    });
+
+    // --- 실시간 친구 관리 시스템 연동 ---
+    window.sendFriendRequest = function() {
+        const targetEmail = document.getElementById('target-user-input').value.trim();
+        if(!targetEmail) return;
+        if(targetEmail === auth.currentUser.email) { alert("본인에게 보낼 수 없습니다."); return; }
+
+        onValue(ref(db, 'users'), (snapshot) => {
+            let targetUid = null;
+            snapshot.forEach((child) => { if(child.val().email === targetEmail) targetUid = child.key; });
+
+            if(targetUid) {
+                set(ref(db, `friendRequests/${targetUid}/${myUid}`), { fromName: myName, fromEmail: auth.currentUser.email });
+                alert("친구 요청 발송 완료!");
+                document.getElementById('target-user-input').value = "";
+            } else { alert("존재하지 않는 유저입니다."); }
+        }, { onlyOnce: true });
+    };
+
+    function listenToFriendRequests() {
+        onValue(ref(db, `friendRequests/${myUid}`), (snapshot) => {
+            const list = document.getElementById('request-list');
+            list.innerHTML = "";
+            if(!snapshot.exists()) { list.innerHTML = `<li class='friend-status'>요청이 없습니다.</li>`; return; }
+
+            snapshot.forEach((child) => {
+                const fUid = child.key; const d = child.val();
+                const li = document.createElement('li'); li.className = "friend-item";
+                li.innerHTML = `<div><div class="friend-name">${d.fromName}</div></div>
+                    <div class="req-buttons">
+                        <button class="btn-sm-accept" onclick="acceptFriend('${fUid}', '${d.fromName}')">수락</button>
+                        <button class="btn-sm-decline" onclick="declineFriend('${fUid}')">거절</button>
+                    </div>`;
+                list.appendChild(li);
+            });
+        });
+    }
+
+    window.acceptFriend = function(fUid, fName) {
+        const up = {};
+        up[`friends/${myUid}/${fUid}`] = { name: fName };
+        up[`friends/${fUid}/${myUid}`] = { name: myName };
+        update(ref(db), up).then(() => remove(ref(db, `friendRequests/${myUid}/${fUid}`)));
+    };
+    window.declineFriend = function(fUid) { remove(ref(db, `friendRequests/${myUid}/${fUid}`)); };
+
+    function listenToFriendList() {
+        onValue(ref(db, `friends/${myUid}`), (snapshot) => {
+            const list = document.getElementById('my-friend-list');
+            list.innerHTML = "";
+            if(!snapshot.exists()) { list.innerHTML = `<li class='friend-status'>친구가 없습니다.</li>`; return; }
+
+            snapshot.forEach((child) => {
+                const fUid = child.key; const fData = child.val();
+                onValue(ref(db, `users/${fUid}`), (uSnap) => {
+                    const st = uSnap.exists() ? uSnap.val().status : "offline";
+                    const old = document.getElementById(`f-${fUid}`); if(old) old.remove();
+                    const li = document.createElement('li'); li.id = `f-${fUid}`;
+                    li.className = `friend-item ${st === 'online' ? 'online' : ''}`;
+                    li.innerHTML = `<div><div class="friend-name">👤 ${fData.name}</div><div class="friend-status">${st === 'online' ? '● 온라인' : '○ 오프라인'}</div></div>`;
+                    list.appendChild(li);
+                });
+            });
+        });
+    }
+
+
+    // --- 🎮 [핵심 추가] 3D 월드 게임 입장 및 구동 파트 ---
+    let scene, camera, renderer, player;
+    let collidableObjects = [];
+    let move = { w: false, a: false, s: false, d: false, space: false };
+    let isRightMouseDown = false;
+    let velocityY = 0, isJumping = false;
+    let pitch = 0, yaw = 0;
+    let animationId;
+
+    let leftUpperLeg, leftLowerLeg, rightUpperLeg, rightLowerLeg;
+    let leftUpperArm, leftLowerArm, rightUpperArm, rightLowerArm;
+    let bodyUpper, headNode;
+
+    window.startGame = function(gameType) {
+        // 웹 레이아웃 감추고 3D 화면 활성화
+        document.getElementById('web-home').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        document.getElementById('chat-ui').style.display = 'block';
+        document.getElementById('back-to-home').style.display = 'block';
+
+        initEngine(gameType);
+        initChat();
+    };
+
+    window.exitGame = function() {
+        // 3D 렌더링 루프를 완전히 종료하고 메모리 해제
+        cancelAnimationFrame(animationId);
+        if (renderer) {
+            renderer.dispose();
+            document.getElementById('game-container').innerHTML = "";
+        }
+        // UI 화면 전환 회복
+        document.getElementById('web-home').style.display = 'grid';
+        document.getElementById('game-container').style.display = 'none';
+        document.getElementById('chat-ui').style.display = 'none';
+        document.getElementById('back-to-home').style.display = 'none';
+        collidableObjects = [];
+    };
+
+    function initEngine(type) {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(type === 'rainbow' ? 0x87CEEB : 0x222222);
+        
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        const light = new THREE.DirectionalLight(0xffffff, 1.2);
+        light.position.set(20, 40, 20);
+        scene.add(light);
+        scene.add(new THREE.AmbientLight(0x666666));
+
+        // 고퀄리티 R15 캐릭터 모델 배치
+        createHighQualityR15Player();
+
+        // 맵 충돌 지형지물 배치
+        if (type === 'rainbow') {
+            createRainbowMap();
+        } else {
+            createDisasterMap();
+        }
+
+        // 제어 핸들러 이벤트 바인딩
+        window.addEventListener('keydown', onKeyDown);
+        window.addEventListener('keyup', onKeyUp);
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('mousemove', onMouseMove);
+
+        animate();
+    }
+
+    function createHighQualityR15Player() {
+        player = new THREE.Group();
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xffe0bd, roughness: 0.3 });
+        const torsoMat = new THREE.MeshStandardMaterial({ color: 0xe63946, roughness: 0.4 });
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1d3557, roughness: 0.5 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.6 });
+
+        const lowerTorso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.5), torsoMat);
+        lowerTorso.position.y = 0.9;
+        player.add(lowerTorso);
+
+        bodyUpper = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.6, 0.52), torsoMat);
+        bodyUpper.position.y = 0.5;
+        lowerTorso.add(bodyUpper);
+
+        headNode = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+        headNode.position.y = 0.6;
+        bodyUpper.add(headNode);
+
+        for(let i=0; i<4; i++) {
+            const h = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.08, 0.56), hairMat);
+            h.position.set(0, 0.26 + (i*0.03), -0.02);
+            headNode.add(h);
+        }
+
+        leftUpperLeg = new THREE.Group(); leftUpperLeg.position.set(-0.22, -0.2, 0); lowerTorso.add(leftUpperLeg);
+        const lul = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.4), pantsMat); lul.position.y = -0.2; leftUpperLeg.add(lul);
+        leftLowerLeg = new THREE.Group(); leftLowerLeg.position.set(0, -0.4, 0); leftUpperLeg.add(leftLowerLeg);
+        const lll = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.4, 0.38), skinMat); lll.position.y = -0.2; leftLowerLeg.add(lll);
+
+        rightUpperLeg = new THREE.Group(); rightUpperLeg.position.set(0.22, -0.2, 0); lowerTorso.add(rightUpperLeg);
+        const rul = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.4), pantsMat); rul.position.y = -0.2; rightUpperLeg.add(rul);
+        rightLowerLeg = new THREE.Group(); rightLowerLeg.position.set(0, -0.4, 0); rightUpperLeg.add(rightLowerLeg);
+        const rll = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.4, 0.38), skinMat); rll.position.y = -0.2; rightLowerLeg.add(rll);
+
+        leftUpperArm = new THREE.Group(); leftUpperArm.position.set(-0.55, 0.2, 0); bodyUpper.add(leftUpperArm);
+        const lua = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.38), torsoMat); lua.position.y = -0.15; leftUpperArm.add(lua);
+        leftLowerArm = new THREE.Group(); leftLowerArm.position.set(0, -0.35, 0); leftUpperArm.add(leftLowerArm);
+        const lla = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.4, 0.36), skinMat); lla.position.y = -0.15; leftLowerArm.add(lla);
+
+        rightUpperArm = new THREE.Group(); rightUpperArm.position.set(0.55, 0.2, 0); bodyUpper.add(rightUpperArm);
+        const rua = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.38), torsoMat); rua.position.y = -0.15; rightUpperArm.add(rua);
+        rightLowerArm = new THREE.Group(); rightLowerArm.position.set(0, -0.35, 0); rightUpperArm.add(rightLowerArm);
+        const rla = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.4, 0.36), skinMat); rla.position.y = -0.15; rightLowerArm.add(rla);
+
+        player.position.set(0, 1, 0);
+        scene.add(player);
+    }
+
+    function createRainbowMap() {
+        const colors = [0xff0000, 0xff7f00, 0xffff00, 0x00ff00, 0x0000ff, 0x4b0082, 0x8b00ff];
+        const startPlatform = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), new THREE.MeshStandardMaterial({color: 0x444444}));
+        startPlatform.position.set(0, -0.5, 0); scene.add(startPlatform); collidableObjects.push(startPlatform);
+
+        for(let i=0; i<25; i++) {
+            const pad = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 4), new THREE.MeshStandardMaterial({color: colors[i % colors.length]}));
+            pad.position.set(Math.sin(i * 1.2) * 2.5, i * 0.75, -(i * 5.0) - 7);
+            scene.add(pad); collidableObjects.push(pad);
+        }
+    }
+
+    function createDisasterMap() {
+        const ground = new THREE.Mesh(new THREE.BoxGeometry(120, 1, 120), new THREE.MeshStandardMaterial({color: 0x333333}));
+        ground.position.y = -0.5; scene.add(ground); collidableObjects.push(ground);
+
+        const centerBuilding = new THREE.Mesh(new THREE.BoxGeometry(16, 40, 16), new THREE.MeshStandardMaterial({color: 0x555555}));
+        centerBuilding.position.set(0, 20, -20); scene.add(centerBuilding); collidableObjects.push(centerBuilding);
+    }
+
+    // --- 입력 장치 제어 루틴 ---
+    function onKeyDown(e) {
+        if(document.activeElement === document.getElementById('chat-input')) return;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') move.w = true;
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') move.s = true;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') move.a = true;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') move.d = true;
+        if (e.code === 'Space') move.space = true;
+    }
+    function onKeyUp(e) {
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') move.w = false;
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') move.s = false;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') move.a = false;
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') move.d = false;
+        if (e.code === 'Space') move.space = false;
+    }
+    function onMouseDown(e) { if(e.button === 2) isRightMouseDown = true; }
+    function onMouseUp(e) { if(e.button === 2) isRightMouseDown = false; }
+    function onMouseMove(e) {
+        if (!isRightMouseDown) return;
+        yaw -= e.movementX * 0.004; pitch -= e.movementY * 0.004;
+        pitch = Math.max(-Math.PI/2.3, Math.min(Math.PI/2.3, pitch));
+    }
+
+    // --- 프레임 애니메이션 물리 시스템 루프 ---
+    let walkCycle = 0;
+    function animate() {
+        animationId = requestAnimationFrame(animate);
+
+        const speed = 0.14;
+        let moveX = 0, moveZ = 0;
+
+        if (move.w) { moveX -= Math.sin(yaw); moveZ -= Math.cos(yaw); }
+        if (move.s) { moveX += Math.sin(yaw); moveZ += Math.cos(yaw); }
+        if (move.a) { moveX -= Math.cos(yaw); moveZ += Math.sin(yaw); }
+        if (move.d) { moveX += Math.cos(yaw); moveZ -= Math.sin(yaw); }
+
+        if (move.w || move.s || move.a || move.d) {
+            const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+            player.position.x += (moveX / len) * speed;
+            player.position.z += (moveZ / len) * speed;
+            player.rotation.y = Math.atan2(moveX, moveZ);
+
+            walkCycle += 0.18;
+            leftUpperLeg.rotation.x = Math.sin(walkCycle) * 0.5;
+            rightUpperLeg.rotation.x = -Math.sin(walkCycle) * 0.5;
+            leftUpperArm.rotation.x = -Math.sin(walkCycle) * 0.4;
+            rightUpperArm.rotation.x = Math.sin(walkCycle) * 0.4;
+        } else {
+            leftUpperLeg.rotation.x *= 0.8; rightUpperLeg.rotation.x *= 0.8;
+            leftUpperArm.rotation.x *= 0.8; rightUpperArm.rotation.x *= 0.8;
+        }
+
+        // 레이캐스터 충돌 감지 가동
+        const raycaster = new THREE.Raycaster();
+        raycaster.set(new THREE.Vector3(player.position.x, player.position.y + 1.0, player.position.z), new THREE.Vector3(0, -1, 0));
+        const intersects = raycaster.intersectObjects(collidableObjects);
+
+        let isOnGround = false; let groundY = -999;
+        if (intersects.length > 0 && intersects[0].distance <= 1.05 + Math.abs(velocityY)) {
+            groundY = intersects[0].point.y; isOnGround = true;
+        }
+
+        if (move.space && !isJumping && isOnGround) { velocityY = 0.25; isJumping = true; }
+
+        if (isJumping || !isOnGround) {
+            player.position.y += velocityY; velocityY -= 0.012;
+            if (velocityY <= 0 && isOnGround && player.position.y <= groundY) {
+                player.position.y = groundY; isJumping = false; velocityY = 0;
+            }
+        } else if (isOnGround) { player.position.y = groundY; velocityY = 0; isJumping = false; }
+
+        if (player.position.y < -15) { player.position.set(0, 2, 0); velocityY = 0; isJumping = false; }
+
+        const radius = 9.5;
+        const offset = new THREE.Vector3(radius * Math.sin(yaw) * Math.cos(pitch), radius * Math.sin(pitch) + 1.8, radius * Math.cos(yaw) * Math.cos(pitch));
+        camera.position.copy(player.position).add(offset);
+        camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
+
+        renderer.render(scene, camera);
+    }
+
+    // --- 인게임 실시간 멀티 채티창 관리 ---
+    function initChat() {
+        const chatRef = ref(db, 'messages');
+        const chatLog = document.getElementById('chat-messages');
+        chatLog.innerHTML = "";
+        onChildAdded(chatRef, (data) => {
+            const msg = data.val();
+            const li = document.createElement('li'); li.style.marginBottom = "5px";
+            li.innerHTML = `<span style="color: #00f2ff; font-weight:bold;">[${msg.user}]</span>: ${msg.text}`;
+            chatLog.appendChild(li); chatLog.scrollTop = chatLog.scrollHeight;
+        });
+    }
+
+    window.sendChat = async () => {
+        const input = document.getElementById('chat-input');
+        if (!input.value.trim()) return;
+        await set(push(ref(db, 'messages')), { user: myName, text: input.value, timestamp: Date.now() });
+        input.value = "";
+    };
+
+    document.getElementById('chat-input').addEventListener('keydown', (e) => { if(e.code === 'Enter') window.sendChat(); });
+    window.addEventListener('beforeunload', () => { if(myUid) update(ref(db, `users/${myUid}`), { status: "offline" }); });
+</script>
+</body>
+</html>
