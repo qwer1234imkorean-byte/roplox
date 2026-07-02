@@ -196,9 +196,8 @@
         }
     });
 
-    // --- 🎮 3D 물리 월드 엔진 코어 ---
+    // --- 🎮 3D 물리 월드 및 R15 고정밀 엔진 코어 ---
     let scene, camera, renderer, player, animationId;
-    let leftArm, rightArm, leftLeg, rightLeg; // 애니메이션용 사지 노드 관절 데이터
     let collidableObjects = [];
     let buildingFloors = [];
     let meteors = [];
@@ -208,7 +207,12 @@
     let activeDisaster = "none";
     let disasterTimer = null;
 
-    // 마우스 우클릭 팝업 메뉴 완전히 비활성화 고정
+    // R15 파트별 관절 그룹 정의
+    let leftUpperLeg, leftLowerLeg, rightUpperLeg, rightLowerLeg;
+    let leftUpperArm, leftLowerArm, rightUpperArm, rightLowerArm;
+    let bodyUpper, headNode;
+
+    // 우클릭할 때 컨텍스트 팝업 뜨는 브라우저 기본 동작 차단
     window.addEventListener('contextmenu', (e) => {
         e.preventDefault();
     });
@@ -243,6 +247,9 @@
             scene.fog = new THREE.FogExp2(0x3A3D40, 0.015);
         } else if(type === 'brookhaven') {
             scene.background = new THREE.Color(0x7ec0ee);
+        } else if(type === 'doors') {
+            scene.background = new THREE.Color(0x050508);
+            scene.fog = new THREE.FogExp2(0x050508, 0.08);
         } else {
             scene.background = new THREE.Color(0x87CEEB);
         }
@@ -250,52 +257,17 @@
         camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
         document.getElementById('game-container').appendChild(renderer.domElement);
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
         dirLight.position.set(20, 40, 20);
+        dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 🤖 고퀄리티 레고 아바타 구조 생성
-        player = new THREE.Group();
-
-        // 1. 몸통 (빨간 티셔츠)
-        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.0, 0.45), new THREE.MeshStandardMaterial({color: 0xe63946, roughness: 0.3}));
-        torso.position.y = 1.1;
-        player.add(torso);
-
-        // 2. 머리 (둥글둥글한 노란색 래고 헤드 스타일)
-        const head = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 16), new THREE.MeshStandardMaterial({color: 0xffd166, roughness: 0.2}));
-        head.position.y = 1.85;
-        player.add(head);
-
-        // 3. 왼팔 / 오른팔 (노란 피부 + 반팔 소매 연출)
-        const armGeo = new THREE.BoxGeometry(0.22, 0.8, 0.22);
-        const armMat = new THREE.MeshStandardMaterial({color: 0xffd166});
-        
-        leftArm = new THREE.Mesh(armGeo, armMat);
-        leftArm.position.set(-0.6, 1.1, 0);
-        player.add(leftArm);
-
-        rightArm = new THREE.Mesh(armGeo, armMat);
-        rightArm.position.set(0.6, 1.1, 0);
-        player.add(rightArm);
-
-        // 4. 왼다리 / 오른다리 (청바지 스타일 블루 파츠)
-        const legGeo = new THREE.BoxGeometry(0.26, 0.7, 0.26);
-        const legMat = new THREE.MeshStandardMaterial({color: 0x1d3557, roughness: 0.4});
-
-        leftLeg = new THREE.Mesh(legGeo, legMat);
-        leftLeg.position.set(-0.25, 0.35, 0);
-        player.add(leftLeg);
-
-        rightLeg = new THREE.Mesh(legGeo, legMat);
-        rightLeg.position.set(0.25, 0.35, 0);
-        player.add(rightLeg);
-
-        player.position.set(0, 3, 0); 
-        scene.add(player);
+        // 🤖 고퀄리티 R15 레고 아바타 구조 탑재
+        createHighQualityR15Player();
 
         buildCustomWorld(type);
 
@@ -313,64 +285,121 @@
         }
     }
 
+    function createHighQualityR15Player() {
+        player = new THREE.Group();
+
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xffe0bd, roughness: 0.3 });
+        const torsoMat = new THREE.MeshStandardMaterial({ color: 0xe63946, roughness: 0.4 });
+        const pantsMat = new THREE.MeshStandardMaterial({ color: 0x1d3557, roughness: 0.5 });
+        const hairMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.6 });
+
+        // 골반 하부 몸통
+        const lowerTorso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.4, 0.5), torsoMat);
+        lowerTorso.position.y = 0.9;
+        lowerTorso.castShadow = true;
+        player.add(lowerTorso);
+
+        // 상체 몸통
+        bodyUpper = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.6, 0.52), torsoMat);
+        bodyUpper.position.y = 0.5;
+        bodyUpper.castShadow = true;
+        lowerTorso.add(bodyUpper);
+
+        // 머리 노드
+        headNode = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+        headNode.position.y = 0.6;
+        headNode.castShadow = true;
+        bodyUpper.add(headNode);
+
+        // 헤어 스타일 레이어 연출
+        for(let i=0; i<5; i++) {
+            const h = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.08, 0.56), hairMat);
+            h.position.set(0, 0.26 + (i*0.03), -0.02);
+            h.rotation.y = i * 0.25 - 0.5;
+            headNode.add(h);
+        }
+
+        // 왼다리 파트 (상/하단 관절 구조)
+        leftUpperLeg = new THREE.Group(); leftUpperLeg.position.set(-0.22, -0.2, 0); lowerTorso.add(leftUpperLeg);
+        const lulMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.4), pantsMat); lulMesh.position.y = -0.2; lulMesh.castShadow = true; leftUpperLeg.add(lulMesh);
+        leftLowerLeg = new THREE.Group(); leftLowerLeg.position.set(0, -0.4, 0); leftUpperLeg.add(leftLowerLeg);
+        const lllMesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.4, 0.38), skinMat); lllMesh.position.y = -0.2; lllMesh.castShadow = true; leftLowerLeg.add(lllMesh);
+
+        // 오른다리 파트 (상/하단 관절 구조)
+        rightUpperLeg = new THREE.Group(); rightUpperLeg.position.set(0.22, -0.2, 0); lowerTorso.add(rightUpperLeg);
+        const rulMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.4, 0.4), pantsMat); rulMesh.position.y = -0.2; rulMesh.castShadow = true; rightUpperLeg.add(rulMesh);
+        rightLowerLeg = new THREE.Group(); rightLowerLeg.position.set(0, -0.4, 0); rightUpperLeg.add(rightLowerLeg);
+        const rllMesh = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.4, 0.38), skinMat); rllMesh.position.y = -0.2; rllMesh.castShadow = true; rightLowerLeg.add(rllMesh);
+
+        // 왼팔 파트
+        leftUpperArm = new THREE.Group(); leftUpperArm.position.set(-0.55, 0.2, 0); bodyUpper.add(leftUpperArm);
+        const luaMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.38), torsoMat); luaMesh.position.y = -0.15; luaMesh.castShadow = true; leftUpperArm.add(luaMesh);
+        leftLowerArm = new THREE.Group(); leftLowerArm.position.set(0, -0.35, 0); leftUpperArm.add(leftLowerArm);
+        const llaMesh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.4, 0.36), skinMat); llaMesh.position.y = -0.15; llaMesh.castShadow = true; leftLowerArm.add(llaMesh);
+
+        // 오른팔 파트
+        rightUpperArm = new THREE.Group(); rightUpperArm.position.set(0.55, 0.2, 0); bodyUpper.add(rightUpperArm);
+        const ruaMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.4, 0.38), torsoMat); ruaMesh.position.y = -0.15; ruaMesh.castShadow = true; rightUpperArm.add(ruaMesh);
+        rightLowerArm = new THREE.Group(); rightLowerArm.position.set(0, -0.35, 0); rightUpperArm.add(rightLowerArm);
+        const rlaMesh = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.4, 0.36), skinMat); rlaMesh.position.y = -0.15; rlaMesh.castShadow = true; rightLowerArm.add(rlaMesh);
+
+        player.position.set(0, 3, 0);
+        scene.add(player);
+    }
+
     function buildCustomWorld(type) {
         if (type === 'disaster') {
             const island = new THREE.Mesh(new THREE.CylinderGeometry(30, 35, 3, 32), new THREE.MeshStandardMaterial({color: 0x556b2f, roughness: 0.9}));
-            island.position.y = -1.5; scene.add(island); collidableObjects.push(island);
+            island.position.y = -1.5; island.receiveShadow = true; scene.add(island); collidableObjects.push(island);
 
             const floorColors = [0xdddddd, 0xbbbbbb, 0x999999, 0x777777, 0x555555];
             for(let i=0; i<5; i++) {
                 const floor = new THREE.Mesh(new THREE.BoxGeometry(12, 1.5, 12), new THREE.MeshStandardMaterial({color: floorColors[i], roughness: 0.4}));
-                floor.position.set(0, i * 4, -4);
-                scene.add(floor);
-                collidableObjects.push(floor);
-                buildingFloors.push(floor);
+                floor.position.set(0, i * 4, -4); floor.castShadow = true; floor.receiveShadow = true;
+                scene.add(floor); collidableObjects.push(floor); buildingFloors.push(floor);
             }
         } 
         else if (type === 'brookhaven') {
             const lawn = new THREE.Mesh(new THREE.BoxGeometry(150, 1, 150), new THREE.MeshStandardMaterial({color: 0x557a2b, roughness: 0.9}));
-            lawn.position.y = -0.5; scene.add(lawn); collidableObjects.push(lawn);
+            lawn.position.y = -0.5; lawn.receiveShadow = true; scene.add(lawn); collidableObjects.push(lawn);
 
             const road = new THREE.Mesh(new THREE.BoxGeometry(20, 1.1, 150), new THREE.MeshStandardMaterial({color: 0x333333}));
-            road.position.set(0, -0.45, 0); scene.add(road); collidableObjects.push(road);
+            road.position.set(0, -0.45, 0); road.receiveShadow = true; scene.add(road); collidableObjects.push(road);
 
             const house1 = new THREE.Mesh(new THREE.BoxGeometry(12, 8, 12), new THREE.MeshStandardMaterial({color: 0xfffdd0}));
-            house1.position.set(-20, 4, -10); scene.add(house1); collidableObjects.push(house1);
+            house1.position.set(-20, 4, -10); house1.castShadow = true; house1.receiveShadow = true; scene.add(house1); collidableObjects.push(house1);
             const roof1 = new THREE.Mesh(new THREE.ConeGeometry(9, 4, 4), new THREE.MeshStandardMaterial({color: 0xcc3333}));
-            roof1.position.set(-20, 10, -10); roof1.rotation.y = Math.PI/4; scene.add(roof1);
+            roof1.position.set(-20, 10, -10); roof1.rotation.y = Math.PI/4; roof1.castShadow = true; scene.add(roof1);
 
             const house2 = new THREE.Mesh(new THREE.BoxGeometry(14, 10, 10), new THREE.MeshStandardMaterial({color: 0x4a90e2}));
-            house2.position.set(22, 5, 15); scene.add(house2); collidableObjects.push(house2);
+            house2.position.set(22, 5, 15); house2.castShadow = true; house2.receiveShadow = true; scene.add(house2); collidableObjects.push(house2);
 
             for(let z = -50; z <= 50; z += 35) {
                 if(z === 0) continue;
                 const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 6), new THREE.MeshStandardMaterial({color: 0x777777}));
-                pole.position.set(-11, 3, z); scene.add(pole); collidableObjects.push(pole);
-                
+                pole.position.set(-11, 3, z); pole.castShadow = true; scene.add(pole); collidableObjects.push(pole);
                 const lightBulb = new THREE.Mesh(new THREE.SphereGeometry(0.4, 8, 8), new THREE.MeshBasicMaterial({color: 0xffea00}));
                 lightBulb.position.set(-11, 6, z); scene.add(lightBulb);
             }
         }
         else if (type === 'rainbow') {
-            const ground = new THREE.Mesh(new THREE.BoxGeometry(30, 1, 30), new THREE.MeshStandardMaterial({color: 0x333333}));
-            ground.position.y = -0.5; scene.add(ground); collidableObjects.push(ground);
-
             const colors = [0xff0000, 0xff7f00, 0xffff00, 0x00ff00, 0x0000ff, 0x4b0082, 0x8b00ff];
-            for(let i=0; i<colors.length; i++) {
-                const step = new THREE.Mesh(new THREE.BoxGeometry(5, 0.5, 5), new THREE.MeshStandardMaterial({color: colors[i], emissive: colors[i], emissiveIntensity:0.2}));
-                step.position.set(0, i * 1.5 + 1, -10 - (i * 6));
-                scene.add(step); collidableObjects.push(step);
+            for(let i=0; i<30; i++) {
+                const pad = new THREE.Mesh(new THREE.BoxGeometry(4, 0.6, 4), new THREE.MeshStandardMaterial({color: colors[i % colors.length]}));
+                pad.position.set(Math.sin(i * 1.2) * 2.5, i * 0.75, -(i * 5.0) - 7);
+                pad.receiveShadow = true; pad.castShadow = true;
+                scene.add(pad); collidableObjects.push(pad);
             }
         }
         else if (type === 'doors') {
             const floor = new THREE.Mesh(new THREE.BoxGeometry(15, 1, 80), new THREE.MeshStandardMaterial({color: 0x4a2e1b, roughness:0.8}));
-            floor.position.set(0, -0.5, -30); scene.add(floor); collidableObjects.push(floor);
+            floor.position.set(0, -0.5, -30); floor.receiveShadow = true; scene.add(floor); collidableObjects.push(floor);
 
             for(let i=0; i<4; i++) {
                 const wallL = new THREE.Mesh(new THREE.BoxGeometry(1, 8, 20), new THREE.MeshStandardMaterial({color: 0x3a2010}));
-                wallL.position.set(-7.5, 3.5, -10 - (i*20)); scene.add(wallL); collidableObjects.push(wallL);
+                wallL.position.set(-7.5, 3.5, -10 - (i*20)); wallL.castShadow = true; scene.add(wallL); collidableObjects.push(wallL);
                 const wallR = new THREE.Mesh(new THREE.BoxGeometry(1, 8, 20), new THREE.MeshStandardMaterial({color: 0x3a2010}));
-                wallR.position.set(7.5, 3.5, -10 - (i*20)); scene.add(wallR); collidableObjects.push(wallR);
+                wallR.position.set(7.5, 3.5, -10 - (i*20)); wallR.castShadow = true; scene.add(wallR); collidableObjects.push(wallR);
             }
         }
     }
@@ -389,28 +418,34 @@
     }
 
     function onKeyDown(e) {
-        if (e.code === 'KeyW') move.w = true; if (e.code === 'KeyS') move.s = true;
-        if (e.code === 'KeyA') move.a = true; if (e.code === 'KeyD') move.d = true;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') move.w = true; 
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') move.s = true;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') move.a = true; 
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') move.d = true;
         if (e.code === 'Space') move.space = true;
     }
     function onKeyUp(e) {
-        if (e.code === 'KeyW') move.w = false; if (e.code === 'KeyS') move.s = false;
-        if (e.code === 'KeyA') move.a = false; if (e.code === 'KeyD') move.d = false;
+        if (e.code === 'KeyW' || e.code === 'ArrowUp') move.w = false; 
+        if (e.code === 'KeyS' || e.code === 'ArrowDown') move.s = false;
+        if (e.code === 'KeyA' || e.code === 'ArrowLeft') move.a = false; 
+        if (e.code === 'KeyD' || e.code === 'ArrowRight') move.d = false;
         if (e.code === 'Space') move.space = false;
     }
     function onMouseMove(e) {
         if (!isRightMouseDown) return;
         yaw -= e.movementX * 0.005; pitch -= e.movementY * 0.005;
-        pitch = Math.max(-Math.PI/2.5, Math.min(Math.PI/2.5, pitch));
+        pitch = Math.max(-Math.PI/2.4, Math.min(Math.PI/2.4, pitch));
     }
 
     let tick = 0;
+    let walkCycle = 0;
+
     function animate() {
         animationId = requestAnimationFrame(animate);
         tick += 0.05;
 
-        // 1. 캐릭터 조작 역학 연산
-        const speed = 0.15; let mx = 0; let mz = 0;
+        // 1. 역학 이동 및 물리 제어
+        const speed = 0.14; let mx = 0; let mz = 0;
         const isMoving = move.w || move.s || move.a || move.d;
 
         if (move.w) { mx -= Math.sin(yaw); mz -= Math.cos(yaw); }
@@ -421,76 +456,85 @@
         if (isMoving) {
             const len = Math.sqrt(mx*mx + mz*mz);
             player.position.x += (mx/len)*speed; player.position.z += (mz/len)*speed;
-            
-            // 캐릭터 진행 방향 각도로 몸체 회전
             player.rotation.y = Math.atan2(mx, mz);
 
-            // 🏃‍♂️ 실시간 걷기 흔들림 애니메이션 매핑
-            leftArm.rotation.x = Math.sin(tick * 2) * 0.5;
-            rightArm.rotation.x = -Math.sin(tick * 2) * 0.5;
-            leftLeg.rotation.x = -Math.sin(tick * 2) * 0.5;
-            rightLeg.rotation.x = Math.sin(tick * 2) * 0.5;
+            // R15 관절 연동 흔들림 주파수 매핑
+            walkCycle += 0.18;
+            const leftAngle = Math.sin(walkCycle);
+            const rightAngle = -Math.sin(walkCycle);
+
+            leftUpperLeg.rotation.x = leftAngle * 0.5;
+            rightUpperLeg.rotation.x = rightAngle * 0.5;
+            leftLowerLeg.rotation.x = Math.max(0, -leftAngle) * 0.4;
+            rightLowerLeg.rotation.x = Math.max(0, -rightAngle) * 0.4;
+
+            leftUpperArm.rotation.x = rightAngle * 0.4;
+            rightUpperArm.rotation.x = leftAngle * 0.4;
+            leftLowerArm.rotation.x = -Math.abs(leftAngle) * 0.2;
+            rightLowerArm.rotation.x = -Math.abs(rightAngle) * 0.2;
         } else {
-            // 정지 상태일 때는 팔다리 원래대로 원복
-            leftArm.rotation.x = 0; rightArm.rotation.x = 0;
-            leftLeg.rotation.x = 0; rightLeg.rotation.x = 0;
+            // 정지 마찰 복원 제어
+            leftUpperLeg.rotation.x *= 0.8; rightUpperLeg.rotation.x *= 0.8;
+            leftLowerLeg.rotation.x *= 0.8; rightLowerLeg.rotation.x *= 0.8;
+            leftUpperArm.rotation.x *= 0.8; rightUpperArm.rotation.x *= 0.8;
+            leftLowerArm.rotation.x *= 0.8; rightLowerArm.rotation.x *= 0.8;
         }
 
-        // 지형 충돌 및 중력 가속도
-        const ray = new THREE.Raycaster(new THREE.Vector3(player.position.x, player.position.y + 0.5, player.position.z), new THREE.Vector3(0, -1, 0));
-        const hits = ray.intersectObjects(collidableObjects);
-        let grounded = false; let groundY = -100;
-        if(hits.length > 0 && hits[0].distance <= 0.1 + Math.abs(velocityY)) {
-            groundY = hits[0].point.y; grounded = true;
+        // 2. ⚡ [덜덜 떨림 원인 차단] 고정밀 수직 충돌 연산 보정 레이캐스트
+        const raycaster = new THREE.Raycaster();
+        const curPos = player.position.clone();
+        
+        // 레이의 중심 원점을 약간 높여서 완전 수직으로 탐사
+        raycaster.set(new THREE.Vector3(curPos.x, curPos.y + 1.0, curPos.z), new THREE.Vector3(0, -1, 0));
+        const hits = raycaster.intersectObjects(collidableObjects);
+        
+        let grounded = false; let groundY = -999;
+        if(hits.length > 0) {
+            const nearest = hits[0];
+            // 지터링(바닥 튕김현상)을 원천 차단하기 위한 임계값 정밀 매칭
+            if(nearest.distance <= 1.05 + Math.abs(velocityY)) {
+                groundY = nearest.point.y;
+                grounded = true;
+            }
         }
 
-        if (move.space && grounded && !isJumping) { velocityY = 0.22; isJumping = true; }
+        if (move.space && grounded && !isJumping) { velocityY = 0.24; isJumping = true; }
         if (isJumping || !grounded) {
-            player.position.y += velocityY; velocityY -= 0.012;
+            player.position.y += velocityY; velocityY -= 0.012; // 중력 가속도
             if(velocityY <= 0 && grounded && player.position.y <= groundY) {
                 player.position.y = groundY; isJumping = false; velocityY = 0;
             }
-        } else if(grounded) { player.position.y = groundY; velocityY = 0; }
+        } else if(grounded) { 
+            player.position.y = groundY; // 정지 상태 또는 이동 중 완벽 밀착 유도
+            velocityY = 0; 
+            isJumping = false; 
+        }
 
-        if(player.position.y < -20) { player.position.set(0, 5, 0); velocityY = 0; }
+        if(player.position.y < -15) { player.position.set(0, 3, 0); velocityY = 0; isJumping = false; }
 
-        // 자연재해 이펙트 연산
+        // 자연재해 연산 효과
         if(activeDisaster.includes("화재")) {
-            buildingFloors.forEach((f, idx) => {
-                if(idx > 1) {
-                    f.position.y -= 0.005;
-                    f.rotation.z = Math.sin(tick + idx) * 0.05;
-                }
-            });
+            buildingFloors.forEach((f, idx) => { if(idx > 1) { f.position.y -= 0.005; f.rotation.z = Math.sin(tick + idx) * 0.05; } });
         } 
         else if(activeDisaster.includes("토네이도")) {
-            buildingFloors.forEach((f, idx) => {
-                f.position.x += Math.sin(tick + idx) * 0.03;
-                f.position.z += Math.cos(tick + idx) * 0.03;
-                f.rotation.y += 0.01 * idx;
-            });
+            buildingFloors.forEach((f, idx) => { f.position.x += Math.sin(tick + idx) * 0.03; f.position.z += Math.cos(tick + idx) * 0.03; f.rotation.y += 0.01 * idx; });
         } 
         else if(activeDisaster.includes("유성우")) {
             if(Math.random() < 0.08) {
                 const met = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 8), new THREE.MeshBasicMaterial({color: 0xffaa00}));
-                met.position.set((Math.random()-0.5)*40, 25, (Math.random()-0.5)*40 - 4);
-                scene.add(met); meteors.push(met);
+                met.position.set((Math.random()-0.5)*40, 25, (Math.random()-0.5)*40 - 4); scene.add(met); meteors.push(met);
             }
             for(let i = meteors.length - 1; i >= 0; i--) {
-                const m = meteors[i];
-                m.position.y -= 0.4; m.position.x += 0.05;
-                if(m.position.y <= 0) {
-                    scene.remove(m); meteors.splice(i, 1);
-                    buildingFloors.forEach(f => { f.position.x += (Math.random()-0.5)*0.3; });
-                }
+                const m = meteors[i]; m.position.y -= 0.4; m.position.x += 0.05;
+                if(m.position.y <= 0) { scene.remove(m); meteors.splice(i, 1); buildingFloors.forEach(f => { f.position.x += (Math.random()-0.5)*0.3; }); }
             }
         }
 
-        // 3인칭 백뷰 카메라 고정 트랙킹
-        const dist = 10.0;
-        const offset = new THREE.Vector3(dist*Math.sin(yaw)*Math.cos(pitch), dist*Math.sin(pitch)+1.5, dist*Math.cos(yaw)*Math.cos(pitch));
+        // 3인칭 스마트 추적 백뷰 카메라 시스템 
+        const dist = 9.5;
+        const offset = new THREE.Vector3(dist*Math.sin(yaw)*Math.cos(pitch), dist*Math.sin(pitch)+1.8, dist*Math.cos(yaw)*Math.cos(pitch));
         camera.position.copy(player.position).add(offset);
-        camera.lookAt(player.position.x, player.position.y + 1, player.position.z);
+        camera.lookAt(player.position.x, player.position.y + 1.2, player.position.z);
 
         renderer.render(scene, camera);
     }
